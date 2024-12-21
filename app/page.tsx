@@ -53,6 +53,15 @@ export default function Home() {
           >
             sv3n.me
           </a>
+          {" • "}
+          <a
+            href="https://github.com/sv3nnie/secureshards"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-400 hover:text-blue-300 transition-colors duration-200"
+          >
+            Source Code
+          </a>
         </p>
       </footer>
     </main>
