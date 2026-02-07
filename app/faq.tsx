@@ -11,7 +11,7 @@ const faqData = [
   {
     question: "How does SecureShards work?",
     answer:
-      "SecureShards works by splitting a secret into multiple parts called shards using the Shamir's Secret Sharing algorithm. The user provides a secret, a password, the threshold number of shards required to reconstruct the secret, and the total number of shards to generate. The secret is encrypted using the password and split into shards, which can be downloaded as text or image files. To recover the original secret, the user must provide the correct password and a sufficient number of shards to reconstruct the secret.",
+      "SecureShards works by splitting a secret into multiple parts called shards using the Shamir's Secret Sharing algorithm. The user provides a secret, a password, the threshold number of shards required to reconstruct the secret, and the total number of shards to generate. The secret is encrypted using the password and split into shards, which can be downloaded as text, image, or PDF files. To recover the original secret, the user must provide the correct password and a sufficient number of shards to reconstruct the secret.",
   },
   {
     question: "How secure is SecureShards?",
@@ -40,7 +40,7 @@ const faqData = [
   },
   {
     question: "What types of file formats are supported for shards?",
-    answer: "SecureShards supports both text and image file formats for shards. Shards can be downloaded as text files (.txt) or image files (.png) for easy sharing and storage.",
+    answer: "SecureShards supports text, image, and PDF file formats for shards. Shards can be downloaded as text files (.txt), image files (.png), or PDF files (.pdf) for easy digital or printable storage.",
   },
   {
     question: "Can I share shard files with others?",

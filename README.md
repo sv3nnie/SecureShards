@@ -7,9 +7,10 @@ SecureShards is a secure, client-side web application that allows users to split
 - **Split & Recover**: Split secrets into multiple encrypted shards and recover them when needed
 - **Threshold-Based Security**: Specify how many shards are required to reconstruct the secret
 - **Client-Side Processing**: All encryption and processing happens in your browser
-- **Multiple Export Formats**: Export shards as text files or QR codes
+- **Multiple Export Formats**: Export shards as text files, QR code images, or PDF recovery sheets
+- **Beginner Guidance**: Preset recommendations, live threshold explainer, and guided demo mode
 - **Password Protection**: Additional encryption layer using user-provided passwords
-- **Drag & Drop Interface**: Easy file handling for shard recovery
+- **Recovery Diagnostics**: See how many shards were parsed, deduplicated, and decoded
 
 ## 🚀 Getting Started
 
@@ -54,14 +55,15 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 1. **Generate Mode**:
    - Enter your secret and a strong password
-   - Choose how many total shards to create and how many are needed for recovery
-   - Export shards as text files or QR codes
+   - Choose a beginner-friendly preset or customize shard thresholds
+   - Export shards as text files, QR codes, or PDF recovery sheets with embedded QR codes and instructions
+   - Confirm the safety checklist before export and optionally run a test recovery
    - Distribute shards to trusted parties or secure locations
 
 2. **Recover Mode**:
-   - Upload the required number of shards
+   - Upload shard files (TXT/PNG/PDF) or use a recent generated test bundle
    - Enter the original password
-   - Recover your secret
+   - Recover your secret and review diagnostics
 
 ## 🔗 Links
 
