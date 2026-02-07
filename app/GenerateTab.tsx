@@ -14,14 +14,8 @@ import {
 import JSZip from "jszip";
 import QRCode from "qrcode";
 import { jsPDF } from "jspdf";
-import { RecoveryTestBundle } from "./types";
 
 type PresetKey = "starter" | "balanced" | "paranoid" | "custom";
-
-type GenerateTabProps = {
-  onRecoveryTestReady: (bundle: RecoveryTestBundle) => void;
-  onStartRecoveryTest: () => void;
-};
 
 const presetOptions: {
   description: string;
@@ -106,7 +100,7 @@ const loadZxcvbn = async () => {
   return zxcvbnModulePromise;
 };
 
-export default function GenerateTab({ onRecoveryTestReady, onStartRecoveryTest }: GenerateTabProps) {
+export default function GenerateTab() {
   const [secret, setSecret] = useState("");
   const [password, setPassword] = useState("");
   const [label, setLabel] = useState("");
@@ -130,8 +124,7 @@ export default function GenerateTab({ onRecoveryTestReady, onStartRecoveryTest }
   });
   const [safetyChecklist, setSafetyChecklist] = useState({
     distributedShards: false,
-    passwordStoredSeparately: false,
-    testedRecovery: false
+    passwordStoredSeparately: false
   });
 
   useEffect(() => {
@@ -245,20 +238,6 @@ export default function GenerateTab({ onRecoveryTestReady, onStartRecoveryTest }
       ...previous,
       [key]: !previous[key]
     }));
-  };
-
-  const loadDemoScenario = () => {
-    setSecret("abandon ability able about above absent absorb abstract absurd abuse access accident");
-    setPassword("Falcon-Tiger-Narwhal-Apple-4821");
-    setShowPassword(true);
-    setLabel("wallet-demo");
-    setRequiredShards(3);
-    setTotalShards(5);
-    setSelectedPreset("balanced");
-    setExportFormats(new Set(["TXT", "PDF"]));
-    setCurrentStep(2);
-    setErrorMessage("");
-    setSuccessMessage("Demo values loaded. Continue through configuration and generate shards.");
   };
 
   const nextStep = () => {
@@ -451,11 +430,11 @@ export default function GenerateTab({ onRecoveryTestReady, onStartRecoveryTest }
 
     y += 22;
     const qrDataUrl = await QRCode.toDataURL(shard, {
-      errorCorrectionLevel: "M",
-      margin: 1,
-      width: 1024
+      errorCorrectionLevel: "H",
+      margin: 4,
+      width: 1400
     });
-    const qrSize = 220;
+    const qrSize = 260;
     const qrX = (pageWidth - qrSize) / 2;
     pdf.addImage(qrDataUrl, "PNG", qrX, y, qrSize, qrSize);
 
@@ -502,8 +481,7 @@ export default function GenerateTab({ onRecoveryTestReady, onStartRecoveryTest }
       setShards(shares);
       setSafetyChecklist({
         distributedShards: false,
-        passwordStoredSeparately: false,
-        testedRecovery: false
+        passwordStoredSeparately: false
       });
       setErrorMessage("");
       setSuccessMessage("Shards generated. Review the safety checklist, then export.");
@@ -527,29 +505,6 @@ export default function GenerateTab({ onRecoveryTestReady, onStartRecoveryTest }
     setErrorMessage("");
   };
 
-  const startRecoveryTest = () => {
-    if (!shards.length) {
-      setErrorMessage("Generate shards first, then you can test recovery.");
-      return;
-    }
-
-    onRecoveryTestReady({
-      createdAt: new Date().toISOString(),
-      label: label || "shards",
-      password,
-      requiredShards,
-      shards,
-      totalShards
-    });
-
-    setSafetyChecklist((previous) => ({
-      ...previous,
-      testedRecovery: true
-    }));
-
-    onStartRecoveryTest();
-  };
-
   return (
     <div className="flex flex-col items-center justify-center w-full">
       <div className="bg-dark shadow-2xl rounded-xl p-8 w-full backdrop-blur-sm bg-opacity-80">
@@ -568,23 +523,8 @@ export default function GenerateTab({ onRecoveryTestReady, onStartRecoveryTest }
                   SecureShards splits sensitive information into encrypted pieces. You need both a minimum number
                   of shards and your password to recover. Everything runs locally in your browser.
                 </p>
-                <p className="text-sm text-gray-400">
-                  New here? Load the demo values and complete a test recovery once before using real secrets.
-                </p>
               </div>
             )}
-          </div>
-
-          <div className="flex flex-col sm:flex-row gap-3">
-            <button
-              onClick={loadDemoScenario}
-              className="px-4 py-2 rounded-lg border border-blue-500/40 bg-blue-500/10 text-blue-300 hover:bg-blue-500/20 transition-colors"
-            >
-              Load Beginner Demo
-            </button>
-            <p className="text-sm text-gray-400 self-center">
-              Demo mode uses sample data so you can practice the full generate and recover flow.
-            </p>
           </div>
 
           <div className="flex flex-col items-center space-y-2 mb-6">
@@ -672,7 +612,7 @@ export default function GenerateTab({ onRecoveryTestReady, onStartRecoveryTest }
                   value={secret}
                   onChange={(event) => setSecret(event.target.value)}
                   rows={4}
-                  placeholder="Enter your secret here..."
+                  placeholder="Enter your secret (e.g., wallet seed phrase, API key, private key)..."
                 />
               </div>
 
@@ -883,32 +823,29 @@ export default function GenerateTab({ onRecoveryTestReady, onStartRecoveryTest }
               {shards.length > 0 && (
                 <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 space-y-3">
                   <p className="text-amber-100 font-semibold">Before exporting, confirm:</p>
-                  <label className="flex items-start gap-3 text-sm text-amber-100">
+                  <label className="group flex items-start gap-3 text-sm text-amber-100 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={safetyChecklist.passwordStoredSeparately}
                       onChange={() => toggleSafetyChecklistItem("passwordStoredSeparately")}
-                      className="mt-0.5"
+                      className="sr-only peer"
                     />
+                    <span className="mt-0.5 h-5 w-5 rounded-md border border-amber-300/60 bg-amber-950/40 text-transparent flex items-center justify-center peer-checked:bg-amber-400 peer-checked:border-amber-400 peer-checked:text-gray-900 transition-colors">
+                      ✓
+                    </span>
                     I stored the password separately from shard files.
                   </label>
-                  <label className="flex items-start gap-3 text-sm text-amber-100">
+                  <label className="group flex items-start gap-3 text-sm text-amber-100 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={safetyChecklist.distributedShards}
                       onChange={() => toggleSafetyChecklistItem("distributedShards")}
-                      className="mt-0.5"
+                      className="sr-only peer"
                     />
+                    <span className="mt-0.5 h-5 w-5 rounded-md border border-amber-300/60 bg-amber-950/40 text-transparent flex items-center justify-center peer-checked:bg-amber-400 peer-checked:border-amber-400 peer-checked:text-gray-900 transition-colors">
+                      ✓
+                    </span>
                     I plan to store shards in different places.
-                  </label>
-                  <label className="flex items-start gap-3 text-sm text-amber-100">
-                    <input
-                      type="checkbox"
-                      checked={safetyChecklist.testedRecovery}
-                      onChange={() => toggleSafetyChecklistItem("testedRecovery")}
-                      className="mt-0.5"
-                    />
-                    I completed a test recovery (recommended).
                   </label>
                   <p className="text-xs text-amber-200">
                     {allSafetyChecksDone
@@ -925,15 +862,6 @@ export default function GenerateTab({ onRecoveryTestReady, onStartRecoveryTest }
                 >
                   Generate Shards
                 </button>
-
-                {shards.length > 0 && (
-                  <button
-                    onClick={startRecoveryTest}
-                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200"
-                  >
-                    Test Recovery Now
-                  </button>
-                )}
 
                 {shards.length > 0 && (
                   <button

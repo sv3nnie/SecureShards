@@ -1,16 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { reconstructString } from "./helpers/secureshards";
 import { EyeIcon, EyeSlashIcon } from "@heroicons/react/20/solid";
 import jsQR from "jsqr";
-import { RecoveryTestBundle } from "./types";
 
 type PdfJsModule = typeof import("pdfjs-dist");
 let pdfJsModulePromise: Promise<PdfJsModule> | null = null;
-
-type RecoverTabProps = {
-  clearRecoveryTestBundle: () => void;
-  recoveryTestBundle: RecoveryTestBundle | null;
-};
 
 type RecoveryDiagnostics = {
   duplicatesIgnored: number;
@@ -19,7 +13,6 @@ type RecoveryDiagnostics = {
   pngFiles: number;
   qrDecoded: number;
   qrFailed: number;
-  sourceTestShards: number;
   supportedFiles: number;
   txtFiles: number;
   uniqueShards: number;
@@ -33,14 +26,13 @@ const initialDiagnostics: RecoveryDiagnostics = {
   pngFiles: 0,
   qrDecoded: 0,
   qrFailed: 0,
-  sourceTestShards: 0,
   supportedFiles: 0,
   txtFiles: 0,
   uniqueShards: 0,
   unsupportedFiles: 0
 };
 
-export default function RecoverTab({ clearRecoveryTestBundle, recoveryTestBundle }: RecoverTabProps) {
+export default function RecoverTab() {
   const [password, setPassword] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
@@ -48,25 +40,11 @@ export default function RecoverTab({ clearRecoveryTestBundle, recoveryTestBundle
   const [recoveredSecret, setRecoveredSecret] = useState("");
   const [uploadedFiles, setUploadedFiles] = useState<FileList | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [testShards, setTestShards] = useState<string[]>([]);
   const [diagnostics, setDiagnostics] = useState<RecoveryDiagnostics | null>(null);
   const [fieldErrors, setFieldErrors] = useState({
     files: false,
     password: false
   });
-
-  useEffect(() => {
-    if (!recoveryTestBundle) {
-      return;
-    }
-
-    setPassword(recoveryTestBundle.password);
-    setTestShards(recoveryTestBundle.shards);
-    setErrorMessage("");
-    setSuccessMessage(
-      `Loaded recent test bundle (${recoveryTestBundle.requiredShards}/${recoveryTestBundle.totalShards}). Click Recover Secret to verify.`
-    );
-  }, [recoveryTestBundle]);
 
   const handleFileUpload = (files: FileList) => {
     setUploadedFiles(files);
@@ -80,32 +58,12 @@ export default function RecoverTab({ clearRecoveryTestBundle, recoveryTestBundle
     return pdfJsModulePromise;
   };
 
-  const loadRecoveryTestBundle = () => {
-    if (!recoveryTestBundle) {
-      return;
-    }
-
-    setPassword(recoveryTestBundle.password);
-    setTestShards(recoveryTestBundle.shards);
-    setErrorMessage("");
-    setSuccessMessage(
-      `Loaded recent test bundle (${recoveryTestBundle.requiredShards}/${recoveryTestBundle.totalShards}).`
-    );
-  };
-
-  const clearLoadedTestBundle = () => {
-    setTestShards([]);
-    clearRecoveryTestBundle();
-    setSuccessMessage("");
-  };
-
   const handleRecovery = async () => {
-    const hasTestShards = testShards.length > 0;
     setDiagnostics(null);
     setRecoveredSecret("");
 
     setFieldErrors({
-      files: !uploadedFiles && !hasTestShards,
+      files: !uploadedFiles,
       password: !password.trim()
     });
 
@@ -115,8 +73,8 @@ export default function RecoverTab({ clearRecoveryTestBundle, recoveryTestBundle
       return;
     }
 
-    if (!uploadedFiles && !hasTestShards) {
-      setErrorMessage("Upload shard files or use the recent generated test bundle.");
+    if (!uploadedFiles) {
+      setErrorMessage("Upload shard files to continue.");
       setSuccessMessage("");
       return;
     }
@@ -124,8 +82,7 @@ export default function RecoverTab({ clearRecoveryTestBundle, recoveryTestBundle
     const shardSet = new Set<string>();
     const nextDiagnostics: RecoveryDiagnostics = {
       ...initialDiagnostics,
-      filesSelected: uploadedFiles?.length || 0,
-      sourceTestShards: testShards.length
+      filesSelected: uploadedFiles.length
     };
 
     const addShard = (value: string | null, isQrSource: boolean) => {
@@ -149,38 +106,32 @@ export default function RecoverTab({ clearRecoveryTestBundle, recoveryTestBundle
     };
 
     try {
-      for (const shard of testShards) {
-        addShard(shard, false);
-      }
+      for (let i = 0; i < uploadedFiles.length; i++) {
+        const file = uploadedFiles[i];
+        const fileName = file.name.toLowerCase();
 
-      if (uploadedFiles) {
-        for (let i = 0; i < uploadedFiles.length; i++) {
-          const file = uploadedFiles[i];
-          const fileName = file.name.toLowerCase();
-
-          if (fileName.endsWith(".txt")) {
-            nextDiagnostics.supportedFiles += 1;
-            nextDiagnostics.txtFiles += 1;
-            addShard(await file.text(), false);
-            continue;
-          }
-
-          if (fileName.endsWith(".png")) {
-            nextDiagnostics.supportedFiles += 1;
-            nextDiagnostics.pngFiles += 1;
-            addShard(await decodeQRFromArrayBuffer(await file.arrayBuffer()), true);
-            continue;
-          }
-
-          if (fileName.endsWith(".pdf")) {
-            nextDiagnostics.supportedFiles += 1;
-            nextDiagnostics.pdfFiles += 1;
-            addShard(await decodeQRFromPdfFile(file), true);
-            continue;
-          }
-
-          nextDiagnostics.unsupportedFiles += 1;
+        if (fileName.endsWith(".txt")) {
+          nextDiagnostics.supportedFiles += 1;
+          nextDiagnostics.txtFiles += 1;
+          addShard(await file.text(), false);
+          continue;
         }
+
+        if (fileName.endsWith(".png")) {
+          nextDiagnostics.supportedFiles += 1;
+          nextDiagnostics.pngFiles += 1;
+          addShard(await decodeQRFromArrayBuffer(await file.arrayBuffer()), true);
+          continue;
+        }
+
+        if (fileName.endsWith(".pdf")) {
+          nextDiagnostics.supportedFiles += 1;
+          nextDiagnostics.pdfFiles += 1;
+          addShard(await decodeQRFromPdfFile(file), true);
+          continue;
+        }
+
+        nextDiagnostics.unsupportedFiles += 1;
       }
 
       nextDiagnostics.uniqueShards = shardSet.size;
@@ -235,12 +186,56 @@ export default function RecoverTab({ clearRecoveryTestBundle, recoveryTestBundle
         canvas.height = img.height;
         context.drawImage(img, 0, 0, img.width, img.height);
         const imageData = context.getImageData(0, 0, img.width, img.height);
-        const code = jsQR(imageData.data, img.width, img.height);
-        resolve(code ? code.data : null);
+        resolve(decodeQrFromImageData(imageData, img.width, img.height));
       };
 
       img.onerror = () => resolve(null);
     });
+  };
+
+  const decodeQrFromImageData = (imageData: ImageData, width: number, height: number) => {
+    const attempts: Array<"attemptBoth" | "dontInvert" | "onlyInvert"> = [
+      "attemptBoth",
+      "dontInvert",
+      "onlyInvert"
+    ];
+
+    for (const inversionAttempts of attempts) {
+      const code = jsQR(imageData.data, width, height, { inversionAttempts });
+      if (code?.data) {
+        return code.data;
+      }
+    }
+
+    return null;
+  };
+
+  const decodeQrFromCanvas = (canvas: HTMLCanvasElement, context: CanvasRenderingContext2D) => {
+    const fullImage = context.getImageData(0, 0, canvas.width, canvas.height);
+    const directDecode = decodeQrFromImageData(fullImage, canvas.width, canvas.height);
+    if (directDecode) {
+      return directDecode;
+    }
+
+    const regionSize = Math.floor(canvas.width * 0.62);
+    const regionX = Math.max(0, Math.floor((canvas.width - regionSize) / 2));
+    const candidateYOffsets = [0.28, 0.34, 0.4];
+
+    for (const offset of candidateYOffsets) {
+      const regionY = Math.max(0, Math.floor(canvas.height * offset));
+      const safeRegionHeight = Math.min(regionSize, canvas.height - regionY);
+      if (safeRegionHeight <= 0) {
+        continue;
+      }
+
+      const regionImage = context.getImageData(regionX, regionY, regionSize, safeRegionHeight);
+      const regionDecode = decodeQrFromImageData(regionImage, regionSize, safeRegionHeight);
+      if (regionDecode) {
+        return regionDecode;
+      }
+    }
+
+    return null;
   };
 
   const decodeQRFromPdfFile = async (file: File) => {
@@ -252,7 +247,7 @@ export default function RecoverTab({ clearRecoveryTestBundle, recoveryTestBundle
     try {
       for (let pageNumber = 1; pageNumber <= pdfDocument.numPages; pageNumber++) {
         const page = await pdfDocument.getPage(pageNumber);
-        const viewport = page.getViewport({ scale: 2 });
+        const viewport = page.getViewport({ scale: 4 });
         const canvas = document.createElement("canvas");
         canvas.width = Math.ceil(viewport.width);
         canvas.height = Math.ceil(viewport.height);
@@ -263,11 +258,9 @@ export default function RecoverTab({ clearRecoveryTestBundle, recoveryTestBundle
         }
 
         await page.render({ canvas, canvasContext: context, viewport }).promise;
-        const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-        const code = jsQR(imageData.data, canvas.width, canvas.height);
-
-        if (code?.data) {
-          return code.data;
+        const qrData = decodeQrFromCanvas(canvas, context);
+        if (qrData) {
+          return qrData;
         }
       }
 
@@ -281,39 +274,6 @@ export default function RecoverTab({ clearRecoveryTestBundle, recoveryTestBundle
     <div className="flex flex-col items-center justify-center w-full">
       <div className="bg-dark shadow-2xl rounded-xl p-8 w-full backdrop-blur-sm bg-opacity-80">
         <div className="space-y-6">
-          {(recoveryTestBundle || testShards.length > 0) && (
-            <div className="bg-indigo-500/10 border border-indigo-500/30 rounded-lg p-4 space-y-3">
-              <p className="text-indigo-200 font-semibold">Quick Recovery Test</p>
-              {recoveryTestBundle && (
-                <p className="text-sm text-indigo-100">
-                  Recent bundle: {recoveryTestBundle.label} ({recoveryTestBundle.requiredShards}/
-                  {recoveryTestBundle.totalShards}) from {new Date(recoveryTestBundle.createdAt).toLocaleString()}.
-                </p>
-              )}
-              <div className="flex flex-wrap gap-3">
-                {recoveryTestBundle && (
-                  <button
-                    onClick={loadRecoveryTestBundle}
-                    className="px-3 py-2 text-sm rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white"
-                  >
-                    Use Recent Generated Shards
-                  </button>
-                )}
-                {testShards.length > 0 && (
-                  <button
-                    onClick={clearLoadedTestBundle}
-                    className="px-3 py-2 text-sm rounded-lg border border-gray-600 text-gray-200 hover:border-gray-400"
-                  >
-                    Clear Test Bundle
-                  </button>
-                )}
-              </div>
-              {testShards.length > 0 && (
-                <p className="text-xs text-indigo-100">{testShards.length} in-memory shard(s) ready for recovery.</p>
-              )}
-            </div>
-          )}
-
           <div>
             <label htmlFor="password-recover" className="text-lg font-semibold mb-2 flex items-center">
               Password
@@ -348,7 +308,7 @@ export default function RecoverTab({ clearRecoveryTestBundle, recoveryTestBundle
             <label className="text-lg font-semibold mb-2 flex items-center">
               Upload Shards
               <span className="ml-2 text-xs px-2 py-0.5 bg-red-500/10 text-red-500 rounded-full border border-red-500/20">
-                {testShards.length > 0 ? "Optional" : "Required"}
+                Required
               </span>
             </label>
             <div
@@ -419,7 +379,6 @@ export default function RecoverTab({ clearRecoveryTestBundle, recoveryTestBundle
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-1 text-sm text-gray-300">
                 <p>Unique shards: {diagnostics.uniqueShards}</p>
                 <p>Duplicates ignored: {diagnostics.duplicatesIgnored}</p>
-                <p>Test bundle shards: {diagnostics.sourceTestShards}</p>
                 <p>Files selected: {diagnostics.filesSelected}</p>
                 <p>Supported files parsed: {diagnostics.supportedFiles}</p>
                 <p>Unsupported files ignored: {diagnostics.unsupportedFiles}</p>

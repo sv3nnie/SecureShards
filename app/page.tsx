@@ -3,11 +3,9 @@ import React, { useState } from "react";
 import GenerateTab from "./GenerateTab";
 import RecoverTab from "./RecoverTab";
 import FAQ from "./faq";
-import { RecoveryTestBundle } from "./types";
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<"generate" | "recover">("generate");
-  const [recoveryTestBundle, setRecoveryTestBundle] = useState<RecoveryTestBundle | null>(null);
 
   return (
     <main className="flex min-h-screen flex-col items-center wrapper">
@@ -39,18 +37,8 @@ export default function Home() {
         </button>
       </div>
 
-      {activeTab === "generate" && (
-        <GenerateTab
-          onRecoveryTestReady={(bundle) => setRecoveryTestBundle(bundle)}
-          onStartRecoveryTest={() => setActiveTab("recover")}
-        />
-      )}
-      {activeTab === "recover" && (
-        <RecoverTab
-          recoveryTestBundle={recoveryTestBundle}
-          clearRecoveryTestBundle={() => setRecoveryTestBundle(null)}
-        />
-      )}
+      {activeTab === "generate" && <GenerateTab />}
+      {activeTab === "recover" && <RecoverTab />}
 
       <FAQ />
 
