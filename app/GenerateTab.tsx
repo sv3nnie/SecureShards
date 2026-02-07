@@ -87,7 +87,8 @@ const words = [
   "zebra"
 ];
 
-const recoveryUrl = "https://secureshards.sv3n.me";
+const fallbackRecoveryUrl = "https://secureshards.sv3n.me";
+const sourceCodeUrl = "https://github.com/sv3nnie/SecureShards";
 const passwordStrengthLabels = ["Very Weak", "Weak", "Fair", "Strong", "Very Strong"];
 type ZxcvbnFn = typeof import("zxcvbn");
 type ZxcvbnModule = { default: ZxcvbnFn };
@@ -269,7 +270,8 @@ export default function GenerateTab() {
   const createRecoveryPackReadme = (
     fileLabel: string,
     selectedFormats: string[],
-    timestamp: number
+    timestamp: number,
+    recoveryEntryUrl: string
   ) => {
     const createdAt = new Date(timestamp).toISOString();
 
@@ -280,9 +282,11 @@ export default function GenerateTab() {
       `Threshold: ${requiredShards} of ${totalShards}`,
       `Formats in this ZIP: ${selectedFormats.join(", ")}`,
       `Created at (UTC): ${createdAt}`,
+      `Recovery website: ${recoveryEntryUrl}`,
+      `Source code: ${sourceCodeUrl}`,
       "",
       "Recovery instructions:",
-      `1. Open ${recoveryUrl}`,
+      `1. Open ${recoveryEntryUrl}`,
       "2. Switch to the Recover tab.",
       "3. Upload enough shard files (TXT, PNG, or PDF).",
       "4. Enter your original password.",
@@ -294,6 +298,17 @@ export default function GenerateTab() {
       "- If your password is lost, recovery is impossible.",
       ""
     ].join("\n");
+  };
+
+  const getRecoveryEntryUrl = () => {
+    if (typeof window === "undefined") {
+      return fallbackRecoveryUrl;
+    }
+
+    const currentUrl = new URL(window.location.href);
+    currentUrl.hash = "";
+    currentUrl.search = "";
+    return currentUrl.toString();
   };
 
   const exportShards = async () => {
@@ -320,8 +335,12 @@ export default function GenerateTab() {
       const timestamp = Date.now();
       const zip = new JSZip();
       const selectedFormats = Array.from(exportFormats).sort();
+      const recoveryEntryUrl = getRecoveryEntryUrl();
 
-      zip.file("Recovery-Pack-README.txt", createRecoveryPackReadme(fileLabel, selectedFormats, timestamp));
+      zip.file(
+        "Recovery-Pack-README.txt",
+        createRecoveryPackReadme(fileLabel, selectedFormats, timestamp, recoveryEntryUrl)
+      );
 
       for (const format of exportFormats) {
         const formatFolder = zip.folder(format);
@@ -351,7 +370,7 @@ export default function GenerateTab() {
         if (format === "PDF") {
           const pdfFiles = await Promise.all(
             shards.map((shard, index) =>
-              createShardPdfBlob(shard, index + 1, shards.length).then((pdfBlob) => ({
+              createShardPdfBlob(shard, index + 1, shards.length, recoveryEntryUrl).then((pdfBlob) => ({
                 index,
                 pdfBlob
               }))
@@ -383,68 +402,110 @@ export default function GenerateTab() {
     }
   };
 
-  const createShardPdfBlob = async (shard: string, shardIndex: number, total: number) => {
+  const createShardPdfBlob = async (
+    shard: string,
+    shardIndex: number,
+    total: number,
+    recoveryEntryUrl: string
+  ) => {
     const pdf = new jsPDF({ format: "a4", orientation: "portrait", unit: "pt" });
     const pageWidth = pdf.internal.pageSize.getWidth();
-    const margin = 44;
-    let y = 56;
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const margin = 36;
+    const contentWidth = pageWidth - margin * 2;
+    const topBandHeight = 128;
 
+    pdf.setFillColor(15, 23, 42);
+    pdf.rect(0, 0, pageWidth, pageHeight, "F");
+    pdf.setFillColor(29, 78, 216);
+    pdf.rect(0, 0, pageWidth, topBandHeight, "F");
+    pdf.setFillColor(59, 130, 246);
+    pdf.rect(0, topBandHeight - 8, pageWidth, 8, "F");
+
+    pdf.setTextColor(255, 255, 255);
     pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(18);
-    pdf.text(`SecureShards Shard ${shardIndex} of ${total}`, margin, y);
+    pdf.setFontSize(21);
+    pdf.text("SecureShards Recovery Sheet", margin, 52);
+    pdf.setFontSize(13);
+    pdf.text(`Shard ${shardIndex} of ${total}`, margin, 76);
 
-    y += 28;
     pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(11);
-
-    const intro = pdf.splitTextToSize(
-      "This PDF contains one encrypted shard encoded as a QR code. Keep this file private and store it separately from your other shards.",
-      pageWidth - margin * 2
+    pdf.setFontSize(10);
+    const headerNote = pdf.splitTextToSize(
+      "This sheet contains one encrypted shard as a QR code. Keep it private and separate from your other shards.",
+      contentWidth
     );
-    pdf.text(intro, margin, y);
-    y += intro.length * 14 + 12;
+    pdf.text(headerNote, margin, 96);
 
+    const instructionsY = topBandHeight + 24;
+    const instructionsHeight = 244;
+    pdf.setFillColor(241, 245, 249);
+    pdf.roundedRect(margin, instructionsY, contentWidth, instructionsHeight, 12, 12, "F");
+    pdf.setTextColor(15, 23, 42);
     pdf.setFont("helvetica", "bold");
-    pdf.text("How to recover your secret:", margin, y);
-    y += 18;
-
+    pdf.setFontSize(13);
+    pdf.text("Recovery Instructions", margin + 16, instructionsY + 24);
     pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(10.5);
+    let stepY = instructionsY + 44;
     const steps = [
-      `1. Open ${recoveryUrl}`,
+      `1. Open ${recoveryEntryUrl}`,
       "2. Switch to the Recover tab.",
       "3. Upload your shard files (TXT, PNG, or PDF).",
       "4. Enter the same password used when you generated the shards.",
       "5. Click Recover Secret."
     ];
-
     steps.forEach((step) => {
-      const lines = pdf.splitTextToSize(step, pageWidth - margin * 2);
-      pdf.text(lines, margin, y);
-      y += lines.length * 14 + 2;
+      const lines = pdf.splitTextToSize(step, contentWidth - 32);
+      pdf.text(lines, margin + 16, stepY);
+      stepY += lines.length * 13 + 4;
     });
 
-    y += 6;
+    const linksY = instructionsY + instructionsHeight - 54;
+    pdf.setFont("helvetica", "bold");
+    pdf.setTextColor(30, 41, 59);
+    pdf.text("Project links", margin + 16, linksY);
+    pdf.setFont("helvetica", "normal");
     pdf.setTextColor(37, 99, 235);
-    pdf.textWithLink(recoveryUrl, margin, y, { url: recoveryUrl });
-    pdf.setTextColor(31, 41, 55);
+    pdf.textWithLink(recoveryEntryUrl, margin + 16, linksY + 16, { url: recoveryEntryUrl });
+    pdf.textWithLink(sourceCodeUrl, margin + 16, linksY + 32, { url: sourceCodeUrl });
 
-    y += 22;
+    const qrCardY = instructionsY + instructionsHeight + 18;
+    const qrCardHeight = pageHeight - qrCardY - 34;
+    pdf.setFillColor(255, 255, 255);
+    pdf.roundedRect(margin, qrCardY, contentWidth, qrCardHeight, 14, 14, "F");
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(12);
+    pdf.setTextColor(15, 23, 42);
+    pdf.text("Encrypted Shard QR", margin + 16, qrCardY + 24);
+    pdf.setFont("helvetica", "normal");
+    pdf.setTextColor(71, 85, 105);
+    pdf.setFontSize(10);
+    const qrTopHint = pdf.splitTextToSize(
+      "Upload this PDF directly in Recover, or print at 100% scale for paper backup.",
+      contentWidth - 32
+    );
+    pdf.text(qrTopHint, margin + 16, qrCardY + 40);
+
+    const qrFrameSize = 268;
+    const qrSize = 248;
+    const qrFrameX = (pageWidth - qrFrameSize) / 2;
+    const qrFrameY = qrCardY + 66;
+    pdf.setDrawColor(203, 213, 225);
+    pdf.setLineWidth(1);
+    pdf.roundedRect(qrFrameX, qrFrameY, qrFrameSize, qrFrameSize, 10, 10, "S");
     const qrDataUrl = await QRCode.toDataURL(shard, {
       errorCorrectionLevel: "H",
       margin: 4,
       width: 1400
     });
-    const qrSize = 260;
     const qrX = (pageWidth - qrSize) / 2;
-    pdf.addImage(qrDataUrl, "PNG", qrX, y, qrSize, qrSize);
+    const qrY = qrFrameY + (qrFrameSize - qrSize) / 2;
+    pdf.addImage(qrDataUrl, "PNG", qrX, qrY, qrSize, qrSize);
 
-    y += qrSize + 20;
-    pdf.setFontSize(10);
-    const qrHint = pdf.splitTextToSize(
-      "The Recover tab reads this QR code automatically when this PDF is uploaded.",
-      pageWidth - margin * 2
-    );
-    pdf.text(qrHint, margin, y);
+    pdf.setFontSize(9.5);
+    pdf.setTextColor(100, 116, 139);
+    pdf.text("Tip: Keep this shard and your password in separate locations.", margin + 16, qrCardY + qrCardHeight - 18);
 
     return pdf.output("blob");
   };

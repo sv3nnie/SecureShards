@@ -68,6 +68,7 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 ## 🔗 Links
 
 - [Website](https://secureshards.sv3n.me)
+- [Source Code](https://github.com/sv3nnie/SecureShards)
 
 ---
 
